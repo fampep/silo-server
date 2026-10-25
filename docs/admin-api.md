@@ -1057,7 +1057,8 @@ client tells "this deployment is older than my build" from "the request failed".
   "log_level_list": true,
   "watch_providers": true,
   "downloads_stats": true,
-  "egress_totals": true
+  "egress_totals": true,
+  "api_clients": true
 }
 ```
 
