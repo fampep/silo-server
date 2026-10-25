@@ -4848,6 +4848,8 @@ export interface RateLimitConfig {
   ip_requests_per_minute: number;
   ip_burst: number;
   auth_endpoints: Record<string, RateLimitAuthEndpointConfig>;
+  /** Hourly token bucket per sign-in session; absent from servers that predate it. */
+  session_quota?: RateLimitSessionQuota;
   /** Whether a limiter is running in this process (GET responses only). */
   active?: boolean;
   /** Backend the running limiter uses; may differ from `backend` until restart. */
@@ -4858,6 +4860,12 @@ export interface RateLimitConfig {
    * answer this.
    */
   redis_available?: boolean;
+}
+
+export interface RateLimitSessionQuota {
+  mode: "off" | "log" | "enforce";
+  requests_per_hour: number;
+  burst: number;
 }
 
 export interface RateLimitUpdateResponse {

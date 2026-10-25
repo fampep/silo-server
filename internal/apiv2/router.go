@@ -202,6 +202,7 @@ type Dependencies struct {
 	AdminJobArtifactSigner        *artworkurl.Signer
 	AdminDiagnosticReads          AdminDiagnosticReadsService
 	AdminDashboardInsights        AdminDashboardInsightsService
+	AdminAPIClients               AdminAPIClientsService
 	AdminNodesRead                AdminNodesReadService
 	AdminNodeCommands             AdminNodeCommandsService
 	AdminNodeDrain                AdminNodeDrainService
