@@ -287,6 +287,11 @@ func TestXCoordinatesRejectAudioLayoutsAndDimensions(t *testing.T) {
 		episode int
 		known   bool
 	}{
+		{"/tv/Example Show/Example Show - [1x02] - Second.mkv", 1, 2, true},
+		{"/tv/Example Show/Example Show (1x02).mkv", 1, 2, true},
+		{"/tv/Example Show/Example Show [1x02 1080p].mkv", 0, 0, false},
+		{"/tv/Example Show/Season 1/Example Show [16x9].mkv", 1, 0, true},
+		{"/tv/Example Show/Example Show [128x96].mkv", 0, 0, false},
 		{"/tv/Example Show/Season 1/[Group] Example Show - 05 [1080p AAC 2.0x2].mkv", 1, 5, true},
 		{"/tv/Example Show/Season 1/[Group] Example Show - 05 [DTS 5.1x2].mkv", 1, 5, true},
 		{"/tv/Example Show/[Group] Example Show - 01 [2048x1080].mkv", 0, 1, false},

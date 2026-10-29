@@ -319,7 +319,11 @@ func validXEpisodeCoordinate(name string, match []int) bool {
 	// Release tags and aspect ratios before release details describe the
 	// video: [16x9 1080p], Movie.4x3.DVDRip.
 	if insideReleaseTag(name, start) {
-		return false
+		// A bracket containing only an NxNN coordinate labels an episode;
+		// brackets with release details and aspect ratios still do not.
+		if !isolatedBracketedXCoordinate(name, match) || aspectRatioRe.MatchString(name[start:match[5]]) {
+			return false
+		}
 	}
 	if aspectRatioRe.MatchString(name[start:match[5]]) {
 		// An aspect ratio yields to release details or an explicit episode
@@ -354,6 +358,21 @@ func validXEpisodeCoordinate(name string, match []int) bool {
 		return true
 	}
 	return len(episode) <= 3 && yearSeasonDay(season, number)
+}
+
+// isolatedBracketedXCoordinate accepts [1x02] and (1x02), but not
+// [1x02 1080p], [AAC 2.0x2], or other release tags.
+func isolatedBracketedXCoordinate(name string, match []int) bool {
+	start, end := match[2], match[5]
+	open := strings.LastIndexAny(name[:start], "[(")
+	if open < 0 || strings.TrimSpace(name[open+1:start]) != "" {
+		return false
+	}
+	closing := byte(']')
+	if name[open] == '(' {
+		closing = ')'
+	}
+	return strings.HasPrefix(strings.TrimLeft(name[end:], " \t"), string(closing))
 }
 
 // yearSeasonDay reports a year-numbered season coordinate. Such seasons start
