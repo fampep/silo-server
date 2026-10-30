@@ -14,7 +14,7 @@ it("launches the selected file once and closes after navigation dispatch", async
   const close = vi.fn();
   render(<DownloadVersionPicker open onOpenChange={close} versions={versions} />);
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: /1080p/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Download selected file" }));
   });
   expect(mocks.launch).toHaveBeenCalledTimes(1);
   expect(mocks.launch).toHaveBeenCalledWith(42, expect.any(Function));
@@ -30,8 +30,8 @@ it("retires a pending selection on replacement and rejects duplicate clicks", as
   );
   const close = vi.fn();
   const view = render(<DownloadVersionPicker open onOpenChange={close} versions={versions} />);
-  fireEvent.click(screen.getByRole("button", { name: /1080p/ }));
-  fireEvent.click(screen.getByRole("button", { name: /1080p/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Download selected file" }));
+  fireEvent.click(screen.getByRole("button", { name: "Download selected file" }));
   expect(mocks.launch).toHaveBeenCalledTimes(1);
   const call = mocks.launch.mock.calls[0];
   if (!call) throw new Error("Expected one launch call");
@@ -47,4 +47,27 @@ it("retires a pending selection on replacement and rejects duplicate clicks", as
   await act(async () => resolve());
   expect(close).not.toHaveBeenCalled();
   expect(mocks.error).not.toHaveBeenCalled();
+});
+
+it("requires a format choice when multiple files are available", async () => {
+  mocks.launch.mockResolvedValue(undefined);
+  const close = vi.fn();
+  render(
+    <DownloadVersionPicker
+      open
+      onOpenChange={close}
+      versions={[
+        versions[0]!,
+        { file_id: 43, resolution: "720p", container: "mkv", file_size: 2048 } as FileVersion,
+      ]}
+    />,
+  );
+  const confirm = screen.getByRole("button", { name: "Download selected file" });
+  expect(confirm).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: /720p/ }));
+  expect(mocks.launch).not.toHaveBeenCalled();
+  expect(confirm).toBeEnabled();
+  await act(async () => fireEvent.click(confirm));
+  expect(mocks.launch).toHaveBeenCalledWith(43, expect.any(Function));
+  expect(close).toHaveBeenCalledWith(false);
 });

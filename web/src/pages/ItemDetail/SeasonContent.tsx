@@ -12,6 +12,7 @@ import { useOnViewTranslation } from "@/hooks/useOnViewTranslation";
 import CastCarousel from "@/components/CastCarousel";
 import CrewList from "@/components/CrewList";
 import EditMetadataDialog from "@/components/EditMetadataDialog";
+import SeriesDownloadPicker from "@/components/SeriesDownloadPicker";
 import PageBack from "@/components/PageBack";
 import ViewTransitionLink from "@/components/ViewTransitionLink";
 import DetailHero from "./DetailHero";
@@ -42,6 +43,7 @@ export default function SeasonContent({ item }: { item: ItemDetail & { type: "se
   const { profile: currentProfile } = useCurrentProfile();
   const canCurateMetadata = canCurateMetadataForUser(user, currentProfile);
   const [editOpen, setEditOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const refreshMetadataMutation = useRefreshItemMetadata();
 
   const {
@@ -165,6 +167,11 @@ export default function SeasonContent({ item }: { item: ItemDetail & { type: "se
               isAdmin={isAdmin}
               canCurateMetadata={canCurateMetadata}
               onEditMetadata={canCurateMetadata ? () => setEditOpen(true) : undefined}
+              onDownload={
+                user?.download_allowed && playableEpisodes.length > 0 && seriesId
+                  ? () => setDownloadOpen(true)
+                  : undefined
+              }
               onShuffle={
                 playableEpisodes.length > 1
                   ? () => startShuffle({ kind: "season", id: item.content_id })
@@ -219,6 +226,16 @@ export default function SeasonContent({ item }: { item: ItemDetail & { type: "se
       </div>
       {canCurateMetadata && (
         <EditMetadataDialog item={item} open={editOpen} onOpenChange={setEditOpen} />
+      )}
+      {seriesId && (
+        <SeriesDownloadPicker
+          open={downloadOpen}
+          onOpenChange={setDownloadOpen}
+          seriesId={seriesId}
+          title={seriesTitle}
+          initialSeasonNumber={seasonNumber}
+          initialEpisodeId={firstUnwatched?.content_id}
+        />
       )}
       {watchTogether.sheet}
     </div>

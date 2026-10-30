@@ -12,6 +12,7 @@ import { useIsActingAdmin } from "@/hooks/useIsActingAdmin";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useMissingSeasonsRequestable } from "@/hooks/useCanRequest";
 import { RequestSeasonsDialog } from "@/components/RequestSeasonsDialog";
+import SeriesDownloadPicker from "@/components/SeriesDownloadPicker";
 import CastCarousel from "@/components/CastCarousel";
 import { buildCrewGroups } from "@/components/castCrewGroups";
 import EditMetadataDialog from "@/components/EditMetadataDialog";
@@ -72,6 +73,7 @@ export default function SeriesContent({
   const [matchOpen, setMatchOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [requestSeasonsOpen, setRequestSeasonsOpen] = useState(false);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const tmdbID = Number(item.tmdb_id) || 0;
   const canRequestSeasons = useMissingSeasonsRequestable(Boolean(currentProfile?.id) && tmdbID > 0);
   const { data: seasonsData, isLoading: seasonsLoading } = useSeasons(item.content_id);
@@ -210,6 +212,11 @@ export default function SeriesContent({
                 onMatchItem={canCurateMetadata ? () => setMatchOpen(true) : undefined}
                 onSplitItem={canCurateMetadata ? () => setSplitOpen(true) : undefined}
                 onRequestSeasons={canRequestSeasons ? () => setRequestSeasonsOpen(true) : undefined}
+                onDownload={
+                  user?.download_allowed && episodeCount > 0
+                    ? () => setDownloadOpen(true)
+                    : undefined
+                }
                 onShuffle={
                   episodeCount > 1
                     ? () => startShuffle({ kind: "series", id: item.content_id })
@@ -287,6 +294,17 @@ export default function SeriesContent({
               onOpenChange={setSplitOpen}
             />
           )}
+          <SeriesDownloadPicker
+            open={downloadOpen}
+            onOpenChange={setDownloadOpen}
+            seriesId={item.content_id}
+            title={title}
+            initialSeasonNumber={
+              nextUpSeason?.season_number ??
+              seasons.find((season) => season.episode_count > 0)?.season_number
+            }
+            initialEpisodeId={nextUpEpisode?.content_id}
+          />
           {watchTogether.sheet}
         </>
       }

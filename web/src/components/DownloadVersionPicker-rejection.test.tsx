@@ -45,7 +45,7 @@ it.each(["account", "profile", "pin", "unchanged"])(
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     const close = vi.fn();
     render(<DownloadVersionPicker open onOpenChange={close} versions={versions} />);
-    fireEvent.click(screen.getByRole("button", { name: /1080p/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Download selected file" }));
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(fetch).toHaveBeenLastCalledWith(link, { method: "HEAD", cache: "no-store" });
     // No close/rerender/versions replacement: only the client authority changes.

@@ -159,3 +159,10 @@ describe("ActionBar primary action", () => {
     expect(request.querySelector("svg")).toHaveClass("animate-spin");
   });
 });
+
+it("shows Download as a direct title action", () => {
+  const onDownload = vi.fn();
+  renderActionBar({ onDownload });
+  fireEvent.click(screen.getByRole("button", { name: "Download" }));
+  expect(onDownload).toHaveBeenCalledOnce();
+});

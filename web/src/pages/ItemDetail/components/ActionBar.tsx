@@ -751,12 +751,6 @@ export default function ActionBar({
         Add to Collection
       </DetailOverflowMenuItem>
     ),
-    onDownload && (
-      <DetailOverflowMenuItem key="download" closeMenu={closeOverflowMenu} onAction={onDownload}>
-        <Download className="size-4" />
-        Download
-      </DetailOverflowMenuItem>
-    ),
     onRequestSeasons && (
       <DetailOverflowMenuItem
         key="request-seasons"
@@ -1065,6 +1059,17 @@ export default function ActionBar({
         ))}
 
         {/* ── Watched toggle ─────────────────────────────────── */}
+        {onDownload && (
+          <Button
+            variant="glass"
+            onClick={onDownload}
+            className={`${responsivePrimaryActionClass} h-11 rounded-full px-5 text-[0.875rem] font-semibold enabled:cursor-pointer`}
+          >
+            <Download className="size-[18px]" />
+            Download
+          </Button>
+        )}
+
         {watchedLabel && onToggleWatched && (
           <Button
             variant="glass"
