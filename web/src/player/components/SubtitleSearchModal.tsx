@@ -4,9 +4,17 @@ import type { PlayerConfig } from "../context/PlayerConfigContext";
 import { playerV2 } from "../player-v2";
 import type { SubtitleLanguageDetection, SubtitleResult } from "@/api/types";
 import { SubtitleUploadForm } from "@/components/subtitles/SubtitleUploadForm";
-import { LANGUAGES } from "../utils/languageNames";
+import { LANGUAGES, getLanguageName } from "../utils/languageNames";
 import { canonicalLanguageWireValue } from "@/lib/languageNames";
+import type { PlayerSubtitleInfo } from "../types";
 import type { StoredSubtitle } from "../utils/subtitleSync";
+import { toast } from "sonner";
+import { PlayerFetchError } from "../player-fetch";
+import {
+  buildSubtitleTranslateRequest,
+  translationSourceForRequest,
+} from "./subtitleTranslateRequest";
+import { sourceLabel } from "./SubtitleTranslateModal";
 
 interface SubtitleSearchModalProps {
   mediaFileId: number;
@@ -20,6 +28,12 @@ interface SubtitleSearchModalProps {
   onSubtitleDownloaded: (subtitle?: StoredSubtitle) => void;
   /** False hides the online-search section; manual upload stays available. */
   onlineSearchEnabled?: boolean;
+  /** Server can translate a text track. The search list then offers a translation when the language is not already on the file. */
+  translationEnabled?: boolean;
+  tracks?: PlayerSubtitleInfo[];
+  onSubtitleJobAccepted?: (jobId: string, resultSubtitleId?: string) => void;
+  sessionId?: string;
+  getStartPosition?: () => number;
 }
 
 interface ProviderInfo {
@@ -31,6 +45,7 @@ const providerInfo: Record<string, ProviderInfo> = {
   opensubtitles: { abbr: "OS", color: "#eab308" },
   subdl: { abbr: "SDL", color: "#3b82f6" },
   subsource: { abbr: "SS", color: "#ef4444" },
+  translate: { abbr: "TR", color: "#a78bfa" },
   upload: { abbr: "UP", color: "#a855f7" },
 };
 
@@ -47,11 +62,17 @@ export function SubtitleSearchModal({
   onClose,
   onSubtitleDownloaded,
   onlineSearchEnabled = true,
+  translationEnabled = false,
+  tracks = [],
+  onSubtitleJobAccepted,
+  sessionId,
+  getStartPosition,
 }: SubtitleSearchModalProps) {
   const [selectedLang, setSelectedLang] = useState("en");
   const [results, setResults] = useState<SubtitleResult[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchedLang, setSearchedLang] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -62,6 +83,7 @@ export function SubtitleSearchModal({
   useEffect(() => {
     downloadGeneration.current++;
     setDownloading(null);
+    setSearchedLang(null);
     return () => {
       downloadGeneration.current++;
     };
@@ -141,6 +163,7 @@ export function SubtitleSearchModal({
     setError(null);
     setResults([]);
     setWarnings([]);
+    setSearchedLang(selectedLang);
 
     try {
       const response = await playerV2(playerConfig, "POST /api/v2/subtitles/search", {
@@ -257,6 +280,78 @@ export function SubtitleSearchModal({
     [playerConfig, mediaFileId, onSubtitleDownloaded, handleClose],
   );
 
+  const translationSource =
+    searchedLang === selectedLang
+      ? translationSourceForRequest(tracks, selectedLang, translationEnabled)
+      : null;
+
+  const handleTranslate = useCallback(async () => {
+    if (!translationSource) return;
+    const generation = downloadGeneration.current;
+    const token = playerConfig.getAccessToken();
+    const profile = playerConfig.getProfileId();
+    const pin = playerConfig.getProfileToken?.();
+    const current = () =>
+      generation === downloadGeneration.current &&
+      token === playerConfig.getAccessToken() &&
+      profile === playerConfig.getProfileId() &&
+      pin === playerConfig.getProfileToken?.();
+    setDownloading("translate");
+    setError(null);
+    try {
+      const body = buildSubtitleTranslateRequest({
+        mode: "subtitles",
+        mediaFileId,
+        sourceTracks: tracks,
+        effectiveSourceIndex: translationSource.index,
+        targetLang: selectedLang,
+        sessionId,
+        startPosition: getStartPosition?.() ?? 0,
+      });
+      const res = await playerV2(playerConfig, "POST /api/v2/subtitles/ai/translate", {
+        body: { ...body, media_file_id: String(mediaFileId), kind: body.kind ?? "translate" },
+      });
+      if (!current()) return;
+      if (
+        !res ||
+        !/^[1-9][0-9]*$/.test(res.job.id) ||
+        res.job.media_file_id !== String(mediaFileId) ||
+        res.job.kind !== (body.kind ?? "translate") ||
+        res.job.source_index !== body.source_index
+      ) {
+        throw new Error("Subtitle processing returned an invalid job.");
+      }
+      const reusedSubtitleId =
+        res.job.status === "completed" ? (res.job.result_subtitle_id ?? undefined) : undefined;
+      onSubtitleJobAccepted?.(res.job.id, reusedSubtitleId);
+      if (reusedSubtitleId) {
+        toast.info("These subtitles were already created, so the saved track is selected.");
+      } else if (!res.live_delivery_attached) {
+        toast.info("Your subtitle job is underway. The track will appear when it's ready.");
+      }
+      handleClose();
+    } catch (err) {
+      if (!current()) return;
+      setError(
+        err instanceof PlayerFetchError || err instanceof Error
+          ? err.message
+          : "Couldn't start translation.",
+      );
+    } finally {
+      if (current()) setDownloading(null);
+    }
+  }, [
+    translationSource,
+    playerConfig,
+    mediaFileId,
+    tracks,
+    selectedLang,
+    sessionId,
+    getStartPosition,
+    onSubtitleJobAccepted,
+    handleClose,
+  ]);
+
   if (!isOpen) return null;
 
   const modal = (
@@ -352,10 +447,36 @@ export function SubtitleSearchModal({
         {/* Results */}
         {onlineSearchEnabled && (
           <div className="max-h-[60vh] overflow-y-auto px-4 pb-4">
-            {results.length === 0 && !searching && !error && (
+            {results.length === 0 && !searching && !error && !translationSource && (
               <p className="py-6 text-center text-xs text-white/40">
-                Select a language and press Search.
+                {searchedLang === selectedLang
+                  ? "No subtitles in that language."
+                  : "Select a language and press Search."}
               </p>
+            )}
+
+            {translationSource && (
+              <button
+                type="button"
+                className="mb-1.5 flex w-full items-center gap-2 rounded bg-white/5 px-3 py-2 text-left hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:outline-none disabled:opacity-50"
+                onClick={() => void handleTranslate()}
+                disabled={downloading !== null}
+              >
+                <span
+                  className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                  style={{
+                    backgroundColor: `${providerInfo.translate.color}22`,
+                    color: providerInfo.translate.color,
+                    border: `1px solid ${providerInfo.translate.color}55`,
+                  }}
+                >
+                  {providerInfo.translate.abbr}
+                </span>
+                <span className="min-w-0 flex-1 text-xs">
+                  Translate {sourceLabel(translationSource)} into{" "}
+                  {getLanguageName(selectedLang) || selectedLang}
+                </span>
+              </button>
             )}
 
             {results.map((result) => {

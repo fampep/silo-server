@@ -6,6 +6,7 @@ import type { PlayerConfig } from "../context/PlayerConfigContext";
 const mocks = vi.hoisted(() => ({ v2: vi.fn() }));
 vi.mock("../player-v2", () => ({ playerV2: mocks.v2 }));
 vi.mock("@/components/subtitles/SubtitleUploadForm", () => ({ SubtitleUploadForm: () => null }));
+vi.mock("sonner", () => ({ toast: { info: vi.fn() } }));
 afterEach(() => {
   cleanup();
   mocks.v2.mockReset();
@@ -123,4 +124,64 @@ it("hands the stored subtitle, including its pending sync, to the player", async
     fireEvent.click(result);
   });
   expect(onSubtitleDownloaded).toHaveBeenCalledExactlyOnceWith(subtitle);
+});
+
+it("asks the server to translate when the searched language is not on the file", async () => {
+  const config: PlayerConfig = {
+    apiBaseUrl: "/api/v1",
+    getAccessToken: () => "synthetic",
+    getProfileId: () => "profile-1",
+    getDeviceId: () => "synthetic-device",
+  };
+  mocks.v2.mockResolvedValueOnce({ results: [], warnings: [] }).mockResolvedValueOnce({
+    job: {
+      id: "11",
+      media_file_id: "42",
+      kind: "translate",
+      source_index: 2,
+      status: "pending",
+    },
+    live_delivery_attached: false,
+  });
+  const onSubtitleJobAccepted = vi.fn();
+  const onClose = vi.fn();
+  render(
+    <SubtitleSearchModal
+      playerConfig={config}
+      mediaFileId={42}
+      isOpen
+      translationEnabled
+      tracks={[
+        {
+          index: 2,
+          language: "ja",
+          label: "Japanese",
+          source: "external",
+          codec: "srt",
+          url: "/subtitle",
+        },
+      ]}
+      onSubtitleJobAccepted={onSubtitleJobAccepted}
+      onSubtitleDownloaded={() => {}}
+      onClose={onClose}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Search" }));
+  const offer = await screen.findByRole("button", { name: /Translate Japanese/ });
+  await act(async () => {
+    fireEvent.click(offer);
+  });
+  expect(mocks.v2).toHaveBeenLastCalledWith(config, "POST /api/v2/subtitles/ai/translate", {
+    body: {
+      media_file_id: "42",
+      source_index: 2,
+      source_language: "ja",
+      target_language: "en",
+      session_id: "",
+      start_position: 0,
+      kind: "translate",
+    },
+  });
+  expect(onSubtitleJobAccepted).toHaveBeenCalledExactlyOnceWith("11", undefined);
+  expect(onClose).toHaveBeenCalled();
 });

@@ -431,6 +431,11 @@ export function SubtitleMenu({
             isOpen={searchOpen}
             onlineSearchEnabled={onlineSearchEnabled}
             onClose={() => setSearchOpen(false)}
+            translationEnabled={aiEnabled}
+            tracks={tracks}
+            sessionId={sessionId}
+            getStartPosition={getSubtitleStartPosition}
+            onSubtitleJobAccepted={onSubtitleJobAccepted}
             onSubtitleDownloaded={(subtitle) => {
               setSearchOpen(false);
               if (subtitle) subtitleSync?.remember(subtitle);

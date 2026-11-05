@@ -75,3 +75,23 @@ export function buildSubtitleTranslateRequest(
     start_position: input.startPosition,
   };
 }
+
+/**
+ * Text track to translate into targetLanguage when that language is not already
+ * on the file. Null when translation is off, the language is already present,
+ * or no text track can be translated.
+ */
+export function translationSourceForRequest(
+  tracks: PlayerSubtitleInfo[] | undefined,
+  targetLanguage: string,
+  enabled: boolean,
+): PlayerSubtitleInfo | null {
+  if (!enabled) return null;
+  const target = normalizeLanguageCode(targetLanguage);
+  if (!target) return null;
+  const list = tracks ?? [];
+  if (list.some((track) => normalizeLanguageCode(track.language) === target)) return null;
+  const sources = list.filter(isTranslatableSource);
+  if (sources.length === 0) return null;
+  return sources.find((track) => normalizeLanguageCode(track.language) !== "") ?? sources[0];
+}
