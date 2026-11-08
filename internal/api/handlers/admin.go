@@ -26,6 +26,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/access"
 	"github.com/Silo-Server/silo-server/internal/adminjob"
 	"github.com/Silo-Server/silo-server/internal/ai/chatgpt"
+	"github.com/Silo-Server/silo-server/internal/ai/grok"
 	apimw "github.com/Silo-Server/silo-server/internal/api/middleware"
 	"github.com/Silo-Server/silo-server/internal/auth"
 	"github.com/Silo-Server/silo-server/internal/auth/passwordhash"
@@ -160,6 +161,7 @@ type ImpersonationService interface {
 // session listing, unmatched files, and system stats.
 type AdminHandler struct {
 	ChatGPT            *chatgpt.Service
+	Grok               *grok.Service
 	userRepo           UserRepository
 	pool               *pgxpool.Pool
 	loginSessions      adminLoginSessionStore
@@ -1791,6 +1793,7 @@ var machineManagedSettingKeys = map[string]bool{
 	"auth.jwt_secret":                           true,
 	"audiobooks.abs.jwt_secret":                 true,
 	chatgpt.CredentialsKey:                      true,
+	grok.CredentialsKey:                         true,
 	config.AIProvidersSettingKey:                true,
 	config.ArtworkStorageReconcileCheckpointKey: true,
 	config.ArtworkStorageSweepCheckpointKey:     true,

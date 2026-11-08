@@ -23,6 +23,7 @@ import (
 	"github.com/Silo-Server/silo-server/internal/activitylog"
 	"github.com/Silo-Server/silo-server/internal/adminjob"
 	"github.com/Silo-Server/silo-server/internal/ai/chatgpt"
+	"github.com/Silo-Server/silo-server/internal/ai/grok"
 	"github.com/Silo-Server/silo-server/internal/ai/jobrunner"
 	"github.com/Silo-Server/silo-server/internal/ai/llm"
 	"github.com/Silo-Server/silo-server/internal/animeids"
@@ -2025,6 +2026,7 @@ func newChiRouter(deps Dependencies) chi.Router {
 	// fixed at construction.
 	var aiClient *llm.Client
 	var chatGPT *chatgpt.Service
+	var grokPlan *grok.Service
 	if store, ok := settingsRepo.(chatgpt.Store); ok && deps.SecretCipher != nil {
 		chatGPT = chatgpt.NewService(store)
 		chatGPT.OnSettingUpdated = func(ctx context.Context, key, value string) {
@@ -2036,13 +2038,29 @@ func newChiRouter(deps Dependencies) chi.Router {
 			}
 		}
 	}
+	if store, ok := settingsRepo.(grok.Store); ok && deps.SecretCipher != nil {
+		grokPlan = grok.NewService(store)
+	}
 	aiConfig := func(cfg *config.Config) llm.Config {
 		c := llmConfigFromServer(cfg)
 		if chatGPT != nil {
 			c.ChatGPTTokenSource = chatGPT.TokenSource
 			c.ChatGPTTokenRejected = chatGPT.RejectToken
 			c.ChatGPTPlanRejected = chatGPT.RejectPlanToken
-			c.TextConfigSource = chatGPT.TextConfig
+		}
+		if chatGPT != nil || grokPlan != nil {
+			c.TextConfigSource = func(ctx context.Context) (llm.Config, error) {
+				if chatGPT != nil {
+					cfg, err := chatGPT.TextConfig(ctx)
+					if err != nil || cfg.AuthMode != llm.AuthModeGrok {
+						return cfg, err
+					}
+				}
+				if grokPlan != nil {
+					return grokPlan.TextConfig(ctx)
+				}
+				return llm.Config{}, grok.ErrSignInRequired
+			}
 		}
 		return c
 	}
@@ -2853,9 +2871,13 @@ func newChiRouter(deps Dependencies) chi.Router {
 		v2deps.AdminSettingsChecks = adminHandler
 		v2deps.AdminAIProviders = adminHandler
 		adminHandler.ChatGPT = chatGPT
+		adminHandler.Grok = grokPlan
 	}
 	if chatGPT != nil {
 		v2deps.ChatGPT = chatGPT
+	}
+	if grokPlan != nil {
+		v2deps.Grok = grokPlan
 	}
 	if watchTogetherHandler != nil {
 		v2deps.WatchTogetherSuggestions = watchTogetherHandler
@@ -5342,7 +5364,7 @@ func llmConfigFromServer(cfg *config.Config) llm.Config {
 // effectiveSubtitleAIConfig derives the subtitle AI service config from the server config.
 func effectiveSubtitleAIConfig(cfg *config.Config) subtitleai.Config {
 	return subtitleai.Config{
-		Configured:            cfg.AI.BaseURL != "" || cfg.AI.AuthMode == llm.AuthModeChatGPT,
+		Configured:            cfg.AI.BaseURL != "" || cfg.AI.AuthMode == llm.AuthModeChatGPT || cfg.AI.AuthMode == llm.AuthModeGrok,
 		SpeechConfigured:      cfg.AI.ASRBaseURL != "",
 		TranslateEnabled:      cfg.SubtitleAI.Enabled,
 		TranscribeEnabled:     cfg.SubtitleAI.TranscribeEnabled,
@@ -5391,7 +5413,7 @@ func (r scopeEntitlementResolver) resolveScope(ctx context.Context, userID int, 
 func metadataAIConfigFromServer(cfg *config.Config) metadatatranslation.Config {
 	return metadatatranslation.Config{
 		Enabled:    cfg.MetadataAI.Enabled,
-		Configured: cfg.AI.BaseURL != "" || cfg.AI.AuthMode == llm.AuthModeChatGPT,
+		Configured: cfg.AI.BaseURL != "" || cfg.AI.AuthMode == llm.AuthModeChatGPT || cfg.AI.AuthMode == llm.AuthModeGrok,
 		ChatModel:  cfg.AI.ChatModel,
 		OnView:     cfg.MetadataAI.OnView,
 	}

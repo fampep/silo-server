@@ -44,7 +44,7 @@ var serverSpecificSettings = strings.Fields(`
 	catalog.search.meilisearch.index
 	playback.ffmpeg_path playback.transcode_dir playback.hw_accel playback.hw_device
 	download.artifact_dir
-	ai.providers ai.chatgpt. ai.text_provider_id ai.speech_provider_id
+	ai.providers ai.chatgpt. ai.grok. ai.text_provider_id ai.speech_provider_id
 	ai.auth_mode ai.chat_model ai.reasoning_effort subtitle_ai.chat_model
 	notifications.push_relay_ notifications.web_push.vapid_keypair
 	jellyfin_compat.public_url jellyfin_compat.web_install_dir

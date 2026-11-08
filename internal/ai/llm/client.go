@@ -37,6 +37,8 @@ type Config struct {
 	ChatGPTPlanRejected  func(context.Context, string) error
 	ChatGPTUsageLimited  func(context.Context, string) error
 	ChatGPTUsageVerified func(context.Context, string) error
+	GrokTokenSource      func(context.Context) (func(context.Context) (string, error), error)
+	GrokTokenRejected    func(context.Context, string, bool) error
 	// Production text requests resolve provider settings and the registration
 	// together. Draft checks and transcription retain their supplied config.
 	TextConfigSource func(context.Context) (Config, error)
@@ -50,6 +52,11 @@ type Config struct {
 }
 
 const AuthModeChatGPT = "chatgpt"
+const AuthModeGrok = "grok"
+
+// GrokClientVersion is the Grok CLI version the subscription chat proxy accepts.
+const GrokClientVersion = "1.0.46"
+const grokResponsesURL = "https://cli-chat-proxy.grok.com/v1/responses"
 const chatJSONFormat = "json_object"
 const serviceTierUltrafast = "ultrafast"
 
@@ -143,6 +150,9 @@ func (c *Client) Chat(ctx context.Context, messages []Message, jsonObject bool) 
 	}
 	if cfg.AuthMode == AuthModeChatGPT {
 		return c.chatGPT(ctx, cfg, messages, jsonObject)
+	}
+	if cfg.AuthMode == AuthModeGrok {
+		return c.chatGrok(ctx, cfg, messages, jsonObject)
 	}
 	if cfg.ServiceTier == serviceTierUltrafast {
 		return c.apiResponses(ctx, cfg, messages, jsonObject)

@@ -246,6 +246,7 @@ func TestSensitiveSettingKeys_Audited(t *testing.T) {
 	mustHave := []string{
 		"auth.jwt_secret",
 		"ai.chatgpt.credentials",
+		"ai.grok.credentials",
 		"audiobooks.abs.jwt_secret",
 		"s3.public_secret_key",
 		"backup.s3.secret_key",

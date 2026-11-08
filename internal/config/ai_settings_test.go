@@ -8,6 +8,7 @@ func TestAISettingsValidateModelReasoningAndAuthentication(t *testing.T) {
 		want                bool
 	}{
 		{"gpt-4o-mini", "", "api_key", true},
+		{"grok-4.7", "", "grok", true},
 		{"gpt-6.1-sol", "high", "chatgpt", true},
 		{"gpt-6.1-sol", "none", "chatgpt", false},
 		{"gpt-4o-mini", "high", "api_key", false},
@@ -43,6 +44,7 @@ func TestAIServiceTierAppliesOnlyToOpenAIAPIKeys(t *testing.T) {
 		{"ultrafast", "api_key", "ultrafast", "ultrafast", AIProviderOpenAI},
 		{"other provider", "api_key", "priority", "", AIProviderOpenRouter},
 		{"ChatGPT plan", "chatgpt", "ultrafast", "", AIProviderOpenAI},
+		{"Grok plan", "grok", "ultrafast", "", AIProviderOpenAI},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			registry := AIProviderRegistry{Providers: []AIProvider{{

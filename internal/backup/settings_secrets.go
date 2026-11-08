@@ -50,7 +50,7 @@ var restoredSecretSettings = strings.Fields(`
 	backup.s3.secret_key
 	storage.transition.target redis.url redis.sentinel_password
 	tmdb.api_key mdblist.api_key introdb.api_key
-	ai.providers ai.chatgpt.credentials ai.api_key ai.asr_api_key subtitle_ai.api_key
+	ai.providers ai.chatgpt.credentials ai.grok.credentials ai.api_key ai.asr_api_key subtitle_ai.api_key
 	recommendations.embedding_auth_token recommendations.openai_api_key
 	catalog.search.meilisearch.api_key watchsync.simkl.client_id watchsync.simkl.client_secret
 	requests.radarr.api_key requests.sonarr.api_key email.smtp_password

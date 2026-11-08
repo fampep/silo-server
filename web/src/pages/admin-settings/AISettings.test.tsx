@@ -132,6 +132,7 @@ vi.mock("@/hooks/queries/admin/chatgpt", () => ({
     data: {
       reasoning_levels: modelReasoningLevels[model] ?? reasoningLevels,
       chatgpt_sign_in: true,
+      grok_sign_in: true,
     },
     isFetching: capabilitiesFetching,
     isSuccess: true,
@@ -152,6 +153,18 @@ vi.mock("@/hooks/queries/admin/aiProviders", () => ({
 }));
 vi.mock("./ChatGPTConnection", () => ({
   ChatGPTConnection: () => <div>ChatGPT connection controls</div>,
+}));
+
+vi.mock("@/hooks/queries/admin/grok", () => ({
+  useGrokStatus: () => ({ data: { connected: false, login_pending: false }, refetch: vi.fn() }),
+  useGrokModels: () => ({ data: { models: [] } }),
+  useStartGrokLogin: () => ({ mutate: vi.fn(), isPending: false }),
+  usePollGrokLogin: () => ({ mutate: vi.fn(), isPending: false }),
+  useDisconnectGrok: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+vi.mock("./GrokConnection", () => ({
+  GrokConnection: () => <div>Grok connection controls</div>,
 }));
 
 vi.mock("sonner", () => ({

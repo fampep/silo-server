@@ -22,7 +22,7 @@ type AdminAIProviderService interface {
 
 type AdminAIProvider struct {
 	ID           string   `json:"id"`
-	Type         string   `json:"type" enum:"openai,gemini,openrouter,groq,ollama,whisper,custom"`
+	Type         string   `json:"type" enum:"openai,gemini,openrouter,groq,xai,ollama,whisper,custom"`
 	Name         string   `json:"name"`
 	BaseURL      string   `json:"base_url" format:"uri"`
 	HasAPIKey    bool     `json:"has_api_key"`
@@ -31,7 +31,7 @@ type AdminAIProvider struct {
 }
 
 type AdminAIProviderType struct {
-	Type           string   `json:"type" enum:"openai,gemini,openrouter,groq,ollama,whisper,custom"`
+	Type           string   `json:"type" enum:"openai,gemini,openrouter,groq,xai,ollama,whisper,custom"`
 	Label          string   `json:"label"`
 	DefaultBaseURL string   `json:"default_base_url" doc:"Prefills a new provider; empty for a custom endpoint, so not validated as a URI."`
 	Capabilities   []string `json:"capabilities" enum:"chat,embeddings,speech" doc:"Fixed capabilities of a known type; empty when the administrator declares them."`
@@ -49,7 +49,7 @@ type AdminAIProviderListOutput struct {
 
 type AdminAIProviderCreateInput struct {
 	Body struct {
-		Type         string   `json:"type" enum:"openai,gemini,openrouter,groq,ollama,whisper,custom"`
+		Type         string   `json:"type" enum:"openai,gemini,openrouter,groq,xai,ollama,whisper,custom"`
 		Name         *string  `json:"name,omitempty" maxLength:"80" doc:"Defaults to the type's label."`
 		BaseURL      *string  `json:"base_url,omitempty" format:"uri" maxLength:"2048" doc:"Defaults to the type's default address."`
 		APIKey       *string  `json:"api_key,omitempty" maxLength:"4096" writeOnly:"true"`
@@ -83,7 +83,7 @@ type AdminAIProviderCheckOutput struct{ Body AdminAIProviderCheck }
 type AdminAIProviderCheckInput struct {
 	Body struct {
 		ID      string  `json:"id,omitempty" maxLength:"64" doc:"The stored provider this draft edits. Its key is reused only for the same address."`
-		Type    string  `json:"type" enum:"openai,gemini,openrouter,groq,ollama,whisper,custom"`
+		Type    string  `json:"type" enum:"openai,gemini,openrouter,groq,xai,ollama,whisper,custom"`
 		BaseURL string  `json:"base_url" format:"uri" minLength:"1" maxLength:"2048"`
 		APIKey  *string `json:"api_key,omitempty" maxLength:"4096" writeOnly:"true"`
 	}

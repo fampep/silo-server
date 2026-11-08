@@ -36,5 +36,8 @@ func (c Config) TextConfigured() bool {
 	if c.AuthMode == AuthModeChatGPT {
 		return c.ChatGPTTokenSource != nil
 	}
+	if c.AuthMode == AuthModeGrok {
+		return c.GrokTokenSource != nil
+	}
 	return c.BaseURL != ""
 }

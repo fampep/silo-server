@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/Silo-Server/silo-server/internal/ai/chatgpt"
+	"github.com/Silo-Server/silo-server/internal/ai/grok"
 	"github.com/Silo-Server/silo-server/internal/config"
 	"github.com/Silo-Server/silo-server/internal/secret"
 )
@@ -83,6 +84,7 @@ var SensitiveSettingKeys = map[string]bool{
 	// (ciphertext is GCM-bound to its key, so none is ever renamed).
 	config.AIProvidersSettingKey: true,
 	chatgpt.CredentialsKey:       true,
+	grok.CredentialsKey:          true,
 	"ai.api_key":                 true,
 	"ai.asr_api_key":             true,
 	"subtitle_ai.api_key":        true,
@@ -141,6 +143,7 @@ func NewEncryptedSettingsRepo(inner SettingsStore, cipher *secret.Cipher) *Encry
 
 var _ SettingsStore = (*EncryptedSettingsRepo)(nil)
 var _ chatgpt.Store = (*EncryptedSettingsRepo)(nil)
+var _ grok.Store = (*EncryptedSettingsRepo)(nil)
 
 // Set encrypts a sensitive, non-empty value (AAD-bound to its key) before
 // delegating to the raw store; non-sensitive keys and empty values delegate

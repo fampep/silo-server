@@ -52,6 +52,7 @@ const TYPE_MONOGRAMS: Record<AIProviderType["type"], [string, string]> = {
   gemini: ["GM", "bg-blue-500/15 text-blue-600 dark:text-blue-300"],
   openrouter: ["OR", "bg-violet-500/15 text-violet-600 dark:text-violet-300"],
   groq: ["GQ", "bg-orange-500/15 text-orange-600 dark:text-orange-300"],
+  xai: ["XA", "bg-sky-500/15 text-sky-700 dark:text-sky-300"],
   ollama: ["OL", "bg-muted text-foreground"],
   whisper: ["WH", "bg-slate-500/15 text-slate-600 dark:text-slate-300"],
   custom: ["{ }", "bg-muted text-muted-foreground"],
@@ -112,6 +113,7 @@ export function AIProvidersList({
   types,
   leading,
   onChooseChatGPT,
+  onChooseGrok,
 }: {
   providers: AIProvider[];
   types: AIProviderType[];
@@ -119,6 +121,8 @@ export function AIProvidersList({
   leading?: ReactNode;
   /** Offers the ChatGPT plan among the types to add; it is set up elsewhere. */
   onChooseChatGPT?: () => void;
+  /** Offers the Grok plan among the types to add; it is set up elsewhere. */
+  onChooseGrok?: () => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -153,6 +157,7 @@ export function AIProvidersList({
         onOpenChange={setAdding}
         types={types}
         onChooseChatGPT={onChooseChatGPT}
+        onChooseGrok={onChooseGrok}
       />
     </>
   );
@@ -260,6 +265,7 @@ function TypeCard({
 }
 
 const CHATGPT_TYPE = "chatgpt";
+const GROK_TYPE = "grok";
 
 /**
  * Connects a provider in two steps: what kind it is, then where it is and its
@@ -274,6 +280,7 @@ export function AddAIProviderDialog({
   capability = "chat",
   onCreated,
   onChooseChatGPT,
+  onChooseGrok,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -281,6 +288,7 @@ export function AddAIProviderDialog({
   capability?: AICapability;
   onCreated?: (provider: AIProvider) => void;
   onChooseChatGPT?: () => void;
+  onChooseGrok?: () => void;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -292,6 +300,7 @@ export function AddAIProviderDialog({
             capability={capability}
             onCreated={onCreated}
             onChooseChatGPT={onChooseChatGPT}
+            onChooseGrok={onChooseGrok}
             onDone={() => onOpenChange(false)}
           />
         ) : null}
@@ -305,12 +314,14 @@ function AddAIProviderSteps({
   capability,
   onCreated,
   onChooseChatGPT,
+  onChooseGrok,
   onDone,
 }: {
   types: AIProviderType[];
   capability: AICapability;
   onCreated?: (provider: AIProvider) => void;
   onChooseChatGPT?: () => void;
+  onChooseGrok?: () => void;
   onDone: () => void;
 }) {
   const [choice, setChoice] = useState<string>(() => types[0]?.type ?? "");
@@ -321,6 +332,11 @@ function AddAIProviderSteps({
     if (choice === CHATGPT_TYPE) {
       onDone();
       onChooseChatGPT?.();
+      return;
+    }
+    if (choice === GROK_TYPE) {
+      onDone();
+      onChooseGrok?.();
       return;
     }
     setStep("details");
@@ -387,13 +403,27 @@ function AddAIProviderSteps({
             onSelect={() => setChoice(CHATGPT_TYPE)}
           />
         ) : null}
+        {onChooseGrok ? (
+          <TypeCard
+            label="Grok plan"
+            tagline="Sign in with a Grok subscription"
+            monogram={["GK", "bg-sky-500/10 text-sky-700 dark:text-sky-300"]}
+            capabilities={["chat"]}
+            selected={choice === GROK_TYPE}
+            onSelect={() => setChoice(GROK_TYPE)}
+          />
+        ) : null}
       </div>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDone}>
           Cancel
         </Button>
         <Button type="button" onClick={next} disabled={choice === ""}>
-          {choice === CHATGPT_TYPE ? "Set up ChatGPT plan" : "Continue"}
+          {choice === CHATGPT_TYPE
+            ? "Set up ChatGPT plan"
+            : choice === GROK_TYPE
+              ? "Set up Grok plan"
+              : "Continue"}
         </Button>
       </DialogFooter>
     </>

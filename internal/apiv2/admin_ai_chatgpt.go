@@ -52,6 +52,7 @@ type AdminAICapabilities struct {
 	ReasoningLevels    []string `json:"reasoning_levels"`
 	OpenAIServiceTiers []string `json:"openai_service_tiers,omitempty" doc:"Service-tier choices for OpenAI API-key text providers. Default omits the upstream parameter; availability and pricing depend on the OpenAI model and account."`
 	ChatGPTSignIn      bool     `json:"chatgpt_sign_in"`
+	GrokSignIn         bool     `json:"grok_sign_in"`
 }
 type AdminAICapabilitiesOutput struct {
 	Status       int
@@ -148,6 +149,7 @@ func registerChatGPT(reg *Registry) {
 			ReasoningLevels:    reasoning.ForModel(in.Model),
 			OpenAIServiceTiers: []string{"default", "priority", "ultrafast"}, //nolint:goconst // OpenAI tiers are independent of media access paths.
 			ChatGPTSignIn:      reg.deps.ChatGPT != nil,
+			GrokSignIn:         reg.deps.Grok != nil,
 		}}, nil
 	})
 	Register(reg, op("GET", "/admin/ai/chatgpt", "getAdminChatGPTConnection", "Read ChatGPT account connection status without credentials."), func(ctx context.Context, _ *struct{}) (*ChatGPTStatusOutput, error) {

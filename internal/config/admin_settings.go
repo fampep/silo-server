@@ -961,7 +961,7 @@ func NormalizeAdminSetting(key, raw string) (string, error) {
 		}
 		return "", fmt.Errorf("%s must be a two-letter ISO 639-1 code or %q", key, MetadataFallbackOriginal)
 	case "ai.auth_mode":
-		return normalizeAdminEnum(key, value, "api_key", aiAuthModeChatGPT)
+		return normalizeAdminEnum(key, value, "api_key", aiAuthModeChatGPT, aiAuthModeGrok)
 	case "ai.reasoning_effort":
 		return normalizeAdminEnum(key, value, "", "none", "minimal", "low", "medium", "high", "xhigh", "max")
 	case AIServiceTierSettingKey:

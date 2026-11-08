@@ -35,7 +35,9 @@ import {
   useChatGPTStatus,
   useChatGPTModels,
 } from "@/hooks/queries/admin/chatgpt";
+import { useGrokStatus } from "@/hooks/queries/admin/grok";
 import { ChatGPTConnection } from "./ChatGPTConnection";
+import { GrokConnection } from "./GrokConnection";
 
 // ---------------------------------------------------------------------------
 // Setting keys
@@ -86,6 +88,7 @@ const KEYS: string[] = Array.from(
 
 /** The text provider select's value for the ChatGPT plan. */
 const CHATGPT_PROVIDER = "chatgpt";
+const GROK_PROVIDER = "grok";
 /**
  * A provider select's value for no provider. Choosing it releases the
  * provider, so it can be removed once no job uses it.
@@ -228,6 +231,7 @@ function TextModelTile({
   serviceTiers,
   serviceTierDirty,
   chatGPTSupported,
+  grokSupported,
   chatModel,
   ready,
   canTest,
@@ -258,6 +262,7 @@ function TextModelTile({
   serviceTiers: string[];
   serviceTierDirty: boolean;
   chatGPTSupported: boolean;
+  grokSupported: boolean;
   chatModel: string;
   ready: boolean;
   canTest: boolean;
@@ -283,9 +288,11 @@ function TextModelTile({
         ? "connected"
         : "not_connected";
   const chatGPT = authMode === CHATGPT_PROVIDER;
+  const grok = authMode === GROK_PROVIDER;
   const provider = providers.find((candidate) => candidate.id === providerID);
-  const selected = chatGPT ? CHATGPT_PROVIDER : providerID;
-  const supportsServiceTier = !chatGPT && provider?.type === "openai" && serviceTiers.length > 0;
+  const selected = chatGPT ? CHATGPT_PROVIDER : grok ? GROK_PROVIDER : providerID;
+  const supportsServiceTier =
+    !chatGPT && !grok && provider?.type === "openai" && serviceTiers.length > 0;
 
   return (
     <ProviderTile
@@ -300,8 +307,8 @@ function TextModelTile({
           : failed
             ? test.message
             : ready
-              ? `${chatModel} · ${chatGPT ? "ChatGPT plan" : (provider?.name ?? "")}`
-              : chatGPT
+              ? `${chatModel} · ${chatGPT ? "ChatGPT plan" : grok ? "Grok plan" : (provider?.name ?? "")}`
+              : chatGPT || grok
                 ? "Connect an account and choose a model"
                 : "Choose a provider and a model"
       }
@@ -316,12 +323,15 @@ function TextModelTile({
         description={
           providers.some((candidate) => candidate.capabilities.includes("chat"))
             ? undefined
-            : "Add a provider that serves chat under Providers, or use a ChatGPT plan."
+            : "Add a provider that serves chat under Providers, or use a ChatGPT or Grok plan."
         }
         options={[
           { value: NO_PROVIDER, label: "None" },
           ...(chatGPTSupported || chatGPT
             ? [{ value: CHATGPT_PROVIDER, label: "ChatGPT plan", disabled: !chatGPTSupported }]
+            : []),
+          ...(grokSupported || grok
+            ? [{ value: GROK_PROVIDER, label: "Grok plan", disabled: !grokSupported }]
             : []),
           ...providerOptions(providers, "chat", providerID),
         ]}
@@ -332,6 +342,11 @@ function TextModelTile({
           onModelChange={(next) => onChange("ai.chat_model", next)}
           onConnectionConfirmed={onConnectionConfirmed}
           onSettingsTransitionStarted={onSettingsTransitionStarted}
+        />
+      ) : grok ? (
+        <GrokConnection
+          model={chatModel}
+          onModelChange={(next) => onChange("ai.chat_model", next)}
         />
       ) : (
         <ModelField
@@ -567,6 +582,36 @@ function ChatGPTProviderRow({
   );
 }
 
+function GrokProviderRow({
+  email,
+  inUse,
+  onManage,
+}: {
+  email: string | undefined;
+  inUse: boolean;
+  onManage: () => void;
+}) {
+  let statePill: string | undefined;
+  if (inUse) statePill = email ? "In use" : "Sign-in needed";
+  else if (email) statePill = "Idle";
+  return (
+    <ProviderTile
+      name="Grok plan"
+      monogram="GK"
+      monogramClass="bg-sky-500/10 text-sky-700 dark:text-sky-300"
+      tagline={email ? `Signed in as ${email}` : "Sign in with a Grok subscription"}
+      meta={
+        inUse
+          ? "Used by Text model. Plans serve chat only, not speech or embeddings."
+          : "Plans serve chat only, not speech or embeddings."
+      }
+      state={inUse && email ? "connected" : "not_connected"}
+      statePill={statePill}
+      primaryAction={{ label: email ? "Manage" : "Connect", onClick: onManage }}
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -590,6 +635,8 @@ export default function AISettings() {
   const capabilityModel = useDebounce(currentModel, 300);
   const capabilities = useAdminAICapabilities(capabilityModel);
   const chatGPTSupported = capabilities.data?.chatgpt_sign_in === true;
+  const grokSupported = capabilities.data?.grok_sign_in === true;
+  const grokConnection = useGrokStatus(authMode === "grok" || grokSupported);
   const providerList = useAIProviders();
   const refreshProviders = useRefreshAIProviders();
   const connection = useChatGPTStatus(false, authMode === "chatgpt" || chatGPTSupported);
@@ -636,7 +683,9 @@ export default function AISettings() {
     authMode === "chatgpt"
       ? authenticatedAccount?.connected === true &&
         !!chatGPTModels.data?.models.some((model) => model.id === chatModel)
-      : serves(textProviderID, "chat") && chatModel.trim() !== "";
+      : authMode === "grok"
+        ? grokConnection.data?.connected === true && chatModel.trim() !== ""
+        : serves(textProviderID, "chat") && chatModel.trim() !== "";
   const textCanTest =
     textReady ||
     (authMode === "chatgpt" &&
@@ -678,8 +727,17 @@ export default function AISettings() {
       setValue("ai.auth_mode", "chatgpt");
       return;
     }
+    if (next === GROK_PROVIDER) {
+      setValue("ai.auth_mode", "grok");
+      return;
+    }
     setValue("ai.auth_mode", "api_key");
     setValue("ai.text_provider_id", next === NO_PROVIDER ? "" : next);
+  }
+
+  function openGrokSetup() {
+    if (authMode !== "grok") selectTextProvider(GROK_PROVIDER);
+    setExpandedTile("text");
   }
 
   // The plan's sign-in lives in the text model tile, the only job it serves.
@@ -752,7 +810,7 @@ export default function AISettings() {
     );
 
     // None releases the text provider; it saves while nothing translates.
-    const textCleared = authMode !== "chatgpt" && textProviderID === "";
+    const textCleared = authMode !== "chatgpt" && authMode !== "grok" && textProviderID === "";
     const textFeaturesOn = subtitleTranslateEnabled || descriptionEnabled;
     const requiresTextConnection =
       (textDirty && (!textCleared || textFeaturesOn)) ||
@@ -762,9 +820,11 @@ export default function AISettings() {
       toast.error(
         authMode === "chatgpt"
           ? "Connect a ChatGPT account and choose an available text model."
-          : textCleared && textDirty
-            ? "Turn off subtitle and description translation before removing the text provider."
-            : "Choose a text provider and a model.",
+          : authMode === "grok"
+            ? "Connect a Grok account and choose a text model."
+            : textCleared && textDirty
+              ? "Turn off subtitle and description translation before removing the text provider."
+              : "Choose a text provider and a model.",
       );
       return;
     }
@@ -818,14 +878,24 @@ export default function AISettings() {
               providers={providers}
               types={providerTypes}
               onChooseChatGPT={chatGPTSupported ? openChatGPTSetup : undefined}
+              onChooseGrok={grokSupported ? openGrokSetup : undefined}
               leading={
-                chatGPTSupported || authMode === "chatgpt" ? (
-                  <ChatGPTProviderRow
-                    email={authenticatedAccount?.email}
-                    inUse={authMode === "chatgpt"}
-                    onManage={openChatGPTSetup}
-                  />
-                ) : null
+                <>
+                  {chatGPTSupported || authMode === "chatgpt" ? (
+                    <ChatGPTProviderRow
+                      email={authenticatedAccount?.email}
+                      inUse={authMode === "chatgpt"}
+                      onManage={openChatGPTSetup}
+                    />
+                  ) : null}
+                  {grokSupported || authMode === "grok" ? (
+                    <GrokProviderRow
+                      email={grokConnection.data?.email}
+                      inUse={authMode === "grok"}
+                      onManage={openGrokSetup}
+                    />
+                  ) : null}
+                </>
               }
             />
           </ProviderTileGrid>
@@ -846,6 +916,7 @@ export default function AISettings() {
               serviceTiers={capabilities.data?.openai_service_tiers ?? []}
               serviceTierDirty={form.isDirty("ai.service_tier")}
               chatGPTSupported={chatGPTSupported}
+              grokSupported={grokSupported}
               chatModel={chatModel}
               ready={textReady}
               canTest={textCanTest}

@@ -18,6 +18,7 @@ import (
 	"golang.org/x/net/idna"
 
 	"github.com/Silo-Server/silo-server/internal/ai/chatgpt"
+	"github.com/Silo-Server/silo-server/internal/ai/grok"
 	"github.com/Silo-Server/silo-server/internal/ai/llm"
 	"github.com/Silo-Server/silo-server/internal/cache"
 	"github.com/Silo-Server/silo-server/internal/catalog"
@@ -147,12 +148,18 @@ func (h *AdminHandler) runAdminSettingsConnectionCheck(ctx context.Context, kind
 	case "recommendations_embedding":
 		response = checkRecommendationsEmbeddingConnection(ctx, cfg, effectiveSettings[recommendations.EmbeddingLockSettingKey])
 	case "ai_chat":
-		if cfg.AI.AuthMode == llm.AuthModeChatGPT {
+		switch cfg.AI.AuthMode {
+		case llm.AuthModeChatGPT:
 			if h.ChatGPT == nil {
 				return connectionCheckResponse{Message: adminChatGPTSignInRequiredMessage, safeMessage: adminChatGPTSignInRequiredMessage}, nil
 			}
 			response = checkAIChatConnectionWithToken(ctx, cfg, h.ChatGPT)
-		} else {
+		case llm.AuthModeGrok:
+			if h.Grok == nil {
+				return connectionCheckResponse{Message: adminGrokSignInRequiredMessage, safeMessage: adminGrokSignInRequiredMessage}, nil
+			}
+			response = checkAIGrokConnection(ctx, cfg, h.Grok)
+		default:
 			response = checkAIChatConnection(ctx, cfg)
 		}
 	case "ai_transcription":
@@ -196,6 +203,35 @@ func aiClientConfig(cfg *config.Config) llm.Config {
 
 func checkAIChatConnection(ctx context.Context, cfg *config.Config) connectionCheckResponse {
 	return checkAIChatConnectionWithToken(ctx, cfg, nil)
+}
+
+const adminGrokSignInRequiredMessage = "Sign in with Grok in AI Services settings."
+
+func checkAIGrokConnection(ctx context.Context, cfg *config.Config, connection *grok.Service) connectionCheckResponse {
+	if strings.TrimSpace(cfg.AI.ChatModel) == "" {
+		return connectionCheckResponse{Success: false, Message: "Chat model is required."}
+	}
+	checkConfig, err := connection.TextConfig(ctx)
+	if err != nil {
+		return connectionCheckResponse{Message: adminGrokSignInRequiredMessage, safeMessage: adminGrokSignInRequiredMessage}
+	}
+	clientCfg := aiClientConfig(cfg)
+	checkConfig.ChatModel = clientCfg.ChatModel
+	checkConfig.ReasoningEffort = clientCfg.ReasoningEffort
+	client := newAdminAISettingsCheckClient(checkConfig)
+	checkCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if _, err := client.Chat(checkCtx, []llm.Message{
+		{Role: "system", Content: "Return a JSON object with status set to ok."},
+		{Role: "user", Content: "Check this Silo text translation connection."},
+	}, true); err != nil {
+		return connectionCheckResponse{
+			Success:     false,
+			Message:     fmt.Sprintf("Text AI connection check failed: %v", err),
+			safeMessage: adminTextAIConnectionFailureMessage,
+		}
+	}
+	return connectionCheckResponse{Success: true, Message: "Text AI connection successful."}
 }
 
 func checkAIChatConnectionWithToken(ctx context.Context, cfg *config.Config, connection *chatgpt.Service) connectionCheckResponse {

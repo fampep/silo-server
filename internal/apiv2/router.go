@@ -250,6 +250,7 @@ type Dependencies struct {
 	AdminCatalogSearch            AdminCatalogSearchService
 	AdminSettingsChecks           AdminSettingsCheckService
 	ChatGPT                       ChatGPTService
+	Grok                          GrokService
 	AdminAIProviders              AdminAIProviderService
 	AdminSettingsInspection       AdminSettingsInspectionService
 	AdminResourceSampler          AdminResourceSampler

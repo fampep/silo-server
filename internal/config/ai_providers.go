@@ -41,11 +41,15 @@ const (
 	geminiBaseURL     = "https://generativelanguage.googleapis.com"
 	groqBaseURL       = "https://api.groq.com/openai"
 	ollamaBaseURL     = "http://ollama:11434"
+	xaiBaseURL        = "https://api.x.ai"
 	speachesBaseURL   = "http://speaches:8000"
 )
 
 // aiAuthModeChatGPT is the ai.auth_mode that serves text from a ChatGPT plan.
 const aiAuthModeChatGPT = "chatgpt"
+
+// aiAuthModeGrok serves text from a Grok subscription.
+const aiAuthModeGrok = "grok"
 
 // AIAuthModeSettingKey says how this server signs in to its text AI provider.
 const AIAuthModeSettingKey = "ai.auth_mode"
@@ -83,6 +87,7 @@ const (
 	AIProviderGemini     AIProviderType = "gemini"
 	AIProviderOpenRouter AIProviderType = "openrouter"
 	AIProviderGroq       AIProviderType = "groq"
+	AIProviderXAI        AIProviderType = "xai"
 	AIProviderOllama     AIProviderType = "ollama"
 	AIProviderWhisper    AIProviderType = "whisper"
 	AIProviderCustom     AIProviderType = "custom"
@@ -120,6 +125,10 @@ var AIProviderTypes = []AIProviderTypeSpec{
 	{
 		Type: AIProviderGroq, Label: "Groq", DefaultBaseURL: groqBaseURL,
 		Capabilities: []AICapability{AICapabilityChat, AICapabilitySpeech}, KeyRequired: true,
+	},
+	{
+		Type: AIProviderXAI, Label: "xAI", DefaultBaseURL: xaiBaseURL,
+		Capabilities: []AICapability{AICapabilityChat}, KeyRequired: true,
 	},
 	{
 		Type: AIProviderOllama, Label: "Ollama", DefaultBaseURL: ollamaBaseURL,
@@ -248,7 +257,7 @@ func ResolveAIEndpoint(values map[string]string, bindingKey string, capability A
 // provider. Keeping the setting when switching providers must not send it to
 // another provider or consume a ChatGPT plan at an API billing tier.
 func ResolveAIServiceTier(values map[string]string) string {
-	if values[AIAuthModeSettingKey] == aiAuthModeChatGPT {
+	if textPlanAuth(values[AIAuthModeSettingKey]) {
 		return ""
 	}
 	registry, err := ParseAIProviderRegistry(values[AIProvidersSettingKey])
@@ -263,6 +272,16 @@ func ResolveAIServiceTier(values map[string]string) string {
 }
 
 var aiProviderIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,63}$`)
+
+// textPlanAuth reports whether a subscription plan, not an API key, serves text.
+func textPlanAuth(mode string) bool {
+	switch strings.TrimSpace(mode) {
+	case aiAuthModeChatGPT, aiAuthModeGrok:
+		return true
+	default:
+		return false
+	}
+}
 
 // NewAIProviderID returns a fresh id for a provider of type t.
 func NewAIProviderID(t AIProviderType) string {
@@ -426,14 +445,14 @@ func ValidateAIProviderBindings(values map[string]string) error {
 }
 
 // AIProviderUsers returns the jobs that send requests to provider id. The
-// text binding is idle while the ChatGPT plan serves text.
+// text binding is idle while a ChatGPT or Grok plan serves text.
 func AIProviderUsers(values map[string]string, id string) []AIJob {
 	var users []AIJob
 	for _, binding := range aiProviderBindings {
 		if id == "" || strings.TrimSpace(values[binding.key]) != id {
 			continue
 		}
-		if binding.job == AIJobText && strings.TrimSpace(values[AIAuthModeSettingKey]) == aiAuthModeChatGPT {
+		if binding.job == AIJobText && textPlanAuth(values[AIAuthModeSettingKey]) {
 			continue
 		}
 		users = append(users, binding.job)
