@@ -9058,7 +9058,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The home page's sections with their cards, as the acting profile sees them. */
+    /** The home page's sections that have cards for the acting profile, with those cards. */
     get: operations["listHomeSections"];
     put?: never;
     post?: never;
@@ -9660,7 +9660,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The library's sections with their cards, as the acting profile sees them. */
+    /** The library's sections that have cards for the acting profile, with those cards. */
     get: operations["listLibrarySections"];
     put?: never;
     post?: never;
@@ -16379,14 +16379,15 @@ export interface components {
       node_id?: string;
     };
     AdminDashboardLayout: {
+      /** @description Stored layout; null when this account has none saved, and the client keeps its local or default arrangement */
       layout: {
         [key: string]: unknown;
-      };
+      } | null;
       /**
        * Format: date-time
-       * @description RFC 3339 instant in UTC with millisecond precision
+       * @description When the stored layout was last saved; null when none is saved
        */
-      updated_at: string;
+      updated_at: string | null;
     };
     AdminDashboardLayoutSaveBody: {
       layout: {
@@ -19209,7 +19210,7 @@ export interface components {
     };
     AdminNotificationPushTestInputBody: {
       /**
-       * @description Opaque identifier
+       * @description A profile on the authenticated account. A profile or device on another account answers 404, as a device that does not exist does.
        * @example 1
        */
       profile_id: string;
@@ -20035,6 +20036,8 @@ export interface components {
       /** @enum {string} */
       source_kind: "silo" | "approved_community" | "external";
       task_bindings: components["schemas"]["AdminPluginTaskBinding"][];
+      /** @description The last automatic update that failed, such as a download that did not match its catalog checksum. Absent when the last check did not fail for this plugin. */
+      update_failure?: components["schemas"]["AdminPluginUpdateFailure"];
       update_policy: string;
       /**
        * Format: date-time
@@ -20178,6 +20181,17 @@ export interface components {
       trigger?: {
         [key: string]: unknown;
       };
+    };
+    AdminPluginUpdateFailure: {
+      /**
+       * Format: date-time
+       * @description RFC 3339 instant in UTC with millisecond precision
+       */
+      failed_at: string;
+      /** @description Why the update was refused, written for the administrator; it names no URL or checksum */
+      reason: string;
+      /** @description The version Silo tried and failed to install */
+      version: string;
     };
     AdminPluginUploadForm: {
       /**
@@ -25883,6 +25897,7 @@ export interface components {
        */
       user_code: string;
       /**
+       * Format: uri
        * @description Page on this server where the approver enters the user code; server.public_url when configured, otherwise the address the device used
        * @example https://silo.example.test/activate
        */
@@ -32069,7 +32084,10 @@ export interface components {
        * @example en
        */
       language: string;
-      /** @example false */
+      /**
+       * @description Whether the profile is limited to allowed_library_ids within its account's libraries. The primary profile is never limited: it sees every library its account can access and hides libraries through its settings instead
+       * @example false
+       */
       library_restrictions_enabled: boolean;
       /**
        * Format: int64
@@ -32143,6 +32161,12 @@ export interface components {
        * @example true
        */
       max_advisory_age_supported: boolean;
+      /**
+       * Format: int64
+       * @description How many profiles this account may have, from its effective access policy; createProfile answers 409 once the household holds this many. Omitted on a remote-playback handoff, which lists only its own profile and cannot create one, and when the server could not read the limit; in that second case a client keeps offering new profiles and createProfile stays the check
+       * @example 5
+       */
+      max_profiles?: number;
       /** @description Cursor state; absent for bounded unpaginated collections */
       page?: components["schemas"]["PageInfo"];
       /**
@@ -32153,7 +32177,7 @@ export interface components {
     };
     ProfileCreate: {
       /**
-       * @description Unique library identifiers the profile may see when restrictions are enabled
+       * @description Unique library identifiers the profile may see when restrictions are enabled. Must be empty on an account's first profile, which becomes its primary profile, even with restrictions off
        * @example [
        *       "1",
        *       "2"
@@ -32180,7 +32204,10 @@ export interface components {
        * @example en
        */
       language?: string;
-      /** @example false */
+      /**
+       * @description Limits the profile to allowed_library_ids. Must be false or omitted on an account's first profile, which becomes its primary profile
+       * @example false
+       */
       library_restrictions_enabled?: boolean;
       /**
        * Format: int64
@@ -32401,7 +32428,10 @@ export interface components {
        * @example en
        */
       language?: string | null;
-      /** @example false */
+      /**
+       * @description Limits the profile to allowed_library_ids. The primary profile can't be limited: true, or a non-empty allowed_library_ids, fails validation on it
+       * @example false
+       */
       library_restrictions_enabled?: boolean;
       /**
        * Format: int64
@@ -34630,6 +34660,11 @@ export interface components {
       /** @description Embedded tracks only: selecting this track, with the plan's delivery and audio, yields subtitle.embedded. The client may switch to it locally and report the change with a subtitle_track_changed replan, which returns a plan for the same media; url, when the row has one, stays the fallback; a bitmap track delivered only by burn-in has none. */
       native_selectable?: boolean;
       source: string;
+      /**
+       * Format: int64
+       * @description Stored subtitle row ID, matching subtitle_ready.subtitle_id. Present for downloaded, uploaded and generated tracks, including tracks without a URL or sync_key. Stable across inventory reordering; selection still uses combined_index.
+       */
+      stored_subtitle_id?: number;
       /**
        * Format: int64
        * @description Embedded tracks only: the absolute probed stream index, the namespace of subtitle.embedded.stream_index and the sidecar URL's embedded_stream_index
@@ -143533,6 +143568,8 @@ export interface operations {
   getPlaybackMedia: {
     parameters: {
       query?: {
+        /** @description Set to refuse by the server on a server_remux_progressive URL whose attempt listed progressive_range_refusal_v1 in deliveries.progressive.features. A progressive remux streams from its seek origin and cannot resume: with it, a GET whose Range starts past byte 0 (or is a suffix range) answers 409 before the remux starts, and the client reopens the stream at its current position. Without it such a range streams from the origin with 200. */
+        remux_range?: "refuse";
         /** @description Signed stream reference the plan URL carries; it reconstructs the session after a restart. Omitted for header-authenticated media. Account and viewer authorization are always required. */
         st?: string;
         /** @description Media-element fallback for the account bearer token when an Authorization header cannot be set. Header-authenticated media requires the Authorization header and the profile selector. */
@@ -143742,6 +143779,8 @@ export interface operations {
   headPlaybackMedia: {
     parameters: {
       query?: {
+        /** @description Set to refuse by the server on a server_remux_progressive URL whose attempt listed progressive_range_refusal_v1 in deliveries.progressive.features. A progressive remux streams from its seek origin and cannot resume: with it, a GET whose Range starts past byte 0 (or is a suffix range) answers 409 before the remux starts, and the client reopens the stream at its current position. Without it such a range streams from the origin with 200. */
+        remux_range?: "refuse";
         /** @description Signed stream reference the plan URL carries; it reconstructs the session after a restart. Omitted for header-authenticated media. Account and viewer authorization are always required. */
         st?: string;
         /** @description Media-element fallback for the account bearer token when an Authorization header cannot be set. Header-authenticated media requires the Authorization header and the profile selector. */
